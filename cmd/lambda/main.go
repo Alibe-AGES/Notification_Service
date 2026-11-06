@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -54,13 +55,19 @@ func handle(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse
 		var push notification
 
 		if err := json.Unmarshal([]byte(message.Body), &push); err != nil {
+			// O corpo nao e logado: pode conter o token do dispositivo.
+			log.Printf("message %s: invalid JSON, returning to queue: %v", message.MessageId, err)
 			result.BatchItemFailures = appendFailure(result.BatchItemFailures, message.MessageId)
 			continue
 		}
 
 		if err := sendToExpo(ctx, push); err != nil {
+			log.Printf("message %s: Expo delivery failed, returning to queue: %v", message.MessageId, err)
 			result.BatchItemFailures = appendFailure(result.BatchItemFailures, message.MessageId)
+			continue
 		}
+
+		log.Printf("message %s: accepted by Expo", message.MessageId)
 	}
 
 	return result, nil
